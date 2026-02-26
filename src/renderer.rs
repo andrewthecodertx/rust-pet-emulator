@@ -1,4 +1,5 @@
 use crate::bus::PetBus;
+use crate::file_dialog::FileDialog;
 use sdl2::pixels::Color;
 use sdl2::rect::Rect;
 use sdl2::render::Canvas;
@@ -50,5 +51,92 @@ pub fn draw_pet_screen(canvas: &mut Canvas<Window>, bus: &PetBus) {
             }
         }
     }
+    canvas.present();
+}
+
+fn get_font_path() -> Option<&'static str> {
+    let paths = [
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "/usr/share/fonts/TTF/DejaVuSans.ttf",
+        "/usr/share/fonts/dejavu/DejaVuSans.ttf",
+    ];
+    for path in &paths {
+        if std::path::Path::new(path).exists() {
+            return Some(path);
+        }
+    }
+    None
+}
+
+pub fn draw_file_dialog(
+    canvas: &mut Canvas<Window>,
+    file_dialog: &FileDialog,
+    ttf_context: &sdl2::ttf::Sdl2TtfContext,
+) {
+    canvas.set_draw_color(Color::RGB(32, 32, 32));
+    canvas.fill_rect(Rect::new(40, 40, 560, 320)).unwrap();
+    canvas.set_draw_color(Color::RGB(200, 200, 200));
+    canvas.draw_rect(Rect::new(40, 40, 560, 320)).unwrap();
+
+    let font_path = match get_font_path() {
+        Some(path) => path,
+        None => return,
+    };
+
+    let font = ttf_context.load_font(font_path, 14).unwrap();
+    let white = Color::RGB(255, 255, 255);
+    let yellow = Color::RGB(255, 255, 0);
+    let texture_creator = canvas.texture_creator();
+
+    let dir_surface = font
+        .render(file_dialog.current_dir())
+        .blended(white)
+        .unwrap();
+    let dir_texture = texture_creator
+        .create_texture_from_surface(&dir_surface)
+        .unwrap();
+    let dir_query = dir_texture.query();
+    canvas
+        .copy(
+            &dir_texture,
+            None,
+            Rect::new(50, 50, dir_query.width, dir_query.height),
+        )
+        .unwrap();
+
+    for (i, entry) in file_dialog.entries().iter().enumerate() {
+        let color = if i == file_dialog.selected_index() {
+            yellow
+        } else {
+            white
+        };
+        let surface = font.render(entry).blended(color).unwrap();
+        let texture = texture_creator
+            .create_texture_from_surface(&surface)
+            .unwrap();
+        let query = texture.query();
+        canvas
+            .copy(
+                &texture,
+                None,
+                Rect::new(50, 70 + (i as i32 * 20), query.width, query.height),
+            )
+            .unwrap();
+    }
+
+    let help_text = "F2: Close | Up/Down: Navigate | Enter: Select | Backspace: Up";
+    let help_surface = font.render(help_text).blended(white).unwrap();
+    let help_texture = texture_creator
+        .create_texture_from_surface(&help_surface)
+        .unwrap();
+    let help_query = help_texture.query();
+    canvas
+        .copy(
+            &help_texture,
+            None,
+            Rect::new(50, 340, help_query.width, help_query.height),
+        )
+        .unwrap();
+
     canvas.present();
 }

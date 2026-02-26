@@ -11,6 +11,17 @@ pub struct Pia6821 {
     irqb1: bool,
     irqb2: bool,
     cycle_count: u32,
+    auto_type_queue: Vec<(usize, usize)>,
+    auto_type_delay: u32,
+    auto_type_timer: u32,
+    auto_type_state: AutoTypeState,
+}
+
+#[derive(Clone, Copy, PartialEq)]
+enum AutoTypeState {
+    Idle,
+    Pressing,
+    Releasing,
 }
 
 impl Pia6821 {
@@ -28,6 +39,10 @@ impl Pia6821 {
             irqb1: false,
             irqb2: false,
             cycle_count: 0,
+            auto_type_queue: Vec::new(),
+            auto_type_delay: 50000,
+            auto_type_timer: 0,
+            auto_type_state: AutoTypeState::Idle,
         }
     }
 
@@ -38,6 +53,43 @@ impl Pia6821 {
             self.cycle_count -= 16666;
             self.irqb1 = true;
         }
+
+        if !self.auto_type_queue.is_empty() {
+            self.auto_type_timer += cycles;
+            if self.auto_type_timer >= self.auto_type_delay {
+                self.auto_type_timer = 0;
+                match self.auto_type_state {
+                    AutoTypeState::Pressing => {
+                        if let Some(&(row, col)) = self.auto_type_queue.last() {
+                            self.set_key(row, col, false);
+                        }
+                        self.auto_type_state = AutoTypeState::Releasing;
+                    }
+                    AutoTypeState::Releasing => {
+                        self.auto_type_queue.pop();
+                        if let Some(&(row, col)) = self.auto_type_queue.last() {
+                            self.set_key(row, col, true);
+                            self.auto_type_state = AutoTypeState::Pressing;
+                        } else {
+                            self.auto_type_state = AutoTypeState::Idle;
+                        }
+                    }
+                    AutoTypeState::Idle => {}
+                }
+            }
+        }
+    }
+
+    pub fn auto_type(&mut self, keys: &[(usize, usize)]) {
+        self.auto_type_queue.clear();
+        for &(row, col) in keys {
+            self.auto_type_queue.push((row, col));
+        }
+        if let Some(&(row, col)) = self.auto_type_queue.last() {
+            self.set_key(row, col, true);
+            self.auto_type_state = AutoTypeState::Pressing;
+        }
+        self.auto_type_timer = 0;
     }
 
     pub fn read_register(&mut self, reg: u8) -> u8 {

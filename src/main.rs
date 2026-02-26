@@ -4,19 +4,23 @@ use std::time::{Duration, Instant};
 
 mod bus;
 mod crtc6845;
+mod file_dialog;
 mod pia6821;
 mod renderer;
 mod rom_loader;
 mod via6522;
 
 use crate::bus::PetBus;
+use crate::file_dialog::{load_prg_file, FileDialog};
+use mos6502::bus::Bus;
 use mos6502::cpu::Cpu;
-use renderer::draw_pet_screen;
+use renderer::{draw_file_dialog, draw_pet_screen};
 use rom_loader::load_roms;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let sdl_context = sdl2::init()?;
     let video_subsystem = sdl_context.video()?;
+    let ttf_context = sdl2::ttf::init()?;
     let window = video_subsystem
         .window("Commodore PET 4032", 640, 400)
         .position_centered()
@@ -33,30 +37,106 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut last_frame = Instant::now();
     let cycles_per_frame = 16666;
+    let mut file_dialog = FileDialog::new("./software");
 
     'running: loop {
         for event in event_pump.poll_iter() {
-            match event {
-                Event::Quit { .. } => break 'running,
-                Event::KeyDown {
-                    keycode: Some(Keycode::Escape),
-                    ..
-                } => break 'running,
-                Event::KeyDown {
-                    keycode: Some(key), ..
-                } => {
-                    if let Some((row, col)) = keycode_to_pet_matrix(key) {
-                        cpu.bus.pia.set_key(row, col, true);
+            if file_dialog.is_visible() {
+                match event {
+                    Event::Quit { .. } => break 'running,
+                    Event::KeyDown {
+                        keycode: Some(Keycode::Escape),
+                        ..
+                    } => break 'running,
+                    Event::KeyDown {
+                        keycode: Some(Keycode::F2),
+                        ..
+                    } => {
+                        file_dialog.hide();
                     }
-                }
-                Event::KeyUp {
-                    keycode: Some(key), ..
-                } => {
-                    if let Some((row, col)) = keycode_to_pet_matrix(key) {
-                        cpu.bus.pia.set_key(row, col, false);
+                    Event::KeyDown {
+                        keycode: Some(Keycode::Up),
+                        ..
+                    } => {
+                        file_dialog.move_selection_up();
                     }
+                    Event::KeyDown {
+                        keycode: Some(Keycode::Down),
+                        ..
+                    } => {
+                        file_dialog.move_selection_down();
+                    }
+                    Event::KeyDown {
+                        keycode: Some(Keycode::Return),
+                        ..
+                    } => {
+                        if let Some(path) = file_dialog.select_current() {
+                            if let Ok((load_addr, data)) = load_prg_file(&path) {
+                                for (i, byte) in data.iter().enumerate() {
+                                    let addr = load_addr.wrapping_add(i as u16);
+                                    cpu.bus.write(addr, *byte);
+                                }
+                                let end_addr = load_addr.wrapping_add(data.len() as u16);
+                                cpu.bus.write(0x0028, (load_addr & 0xFF) as u8);
+                                cpu.bus.write(0x0029, (load_addr >> 8) as u8);
+                                cpu.bus.write(0x002A, (end_addr & 0xFF) as u8);
+                                cpu.bus.write(0x002B, (end_addr >> 8) as u8);
+                                let run_keys = [(7, 2), (2, 3), (3, 1), (6, 5)];
+                                cpu.bus.pia.auto_type(&run_keys);
+                            }
+                        }
+                    }
+                    Event::KeyDown {
+                        keycode: Some(Keycode::Backspace),
+                        ..
+                    } => {
+                        file_dialog.go_up();
+                    }
+                    Event::KeyDown {
+                        keycode: Some(key), ..
+                    } => {
+                        if let Some((row, col)) = keycode_to_pet_matrix(key) {
+                            cpu.bus.pia.set_key(row, col, true);
+                        }
+                    }
+                    Event::KeyUp {
+                        keycode: Some(key), ..
+                    } => {
+                        if let Some((row, col)) = keycode_to_pet_matrix(key) {
+                            cpu.bus.pia.set_key(row, col, false);
+                        }
+                    }
+                    _ => {}
                 }
-                _ => {}
+            } else {
+                match event {
+                    Event::Quit { .. } => break 'running,
+                    Event::KeyDown {
+                        keycode: Some(Keycode::Escape),
+                        ..
+                    } => break 'running,
+                    Event::KeyDown {
+                        keycode: Some(Keycode::F2),
+                        ..
+                    } => {
+                        file_dialog.show();
+                    }
+                    Event::KeyDown {
+                        keycode: Some(key), ..
+                    } => {
+                        if let Some((row, col)) = keycode_to_pet_matrix(key) {
+                            cpu.bus.pia.set_key(row, col, true);
+                        }
+                    }
+                    Event::KeyUp {
+                        keycode: Some(key), ..
+                    } => {
+                        if let Some((row, col)) = keycode_to_pet_matrix(key) {
+                            cpu.bus.pia.set_key(row, col, false);
+                        }
+                    }
+                    _ => {}
+                }
             }
         }
 
@@ -71,7 +151,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
 
-        draw_pet_screen(&mut canvas, &cpu.bus);
+        if file_dialog.is_visible() {
+            draw_file_dialog(&mut canvas, &file_dialog, &ttf_context);
+        } else {
+            draw_pet_screen(&mut canvas, &cpu.bus);
+        }
 
         let elapsed = last_frame.elapsed();
         if elapsed < Duration::from_millis(16) {

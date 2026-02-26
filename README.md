@@ -50,6 +50,24 @@ Or run the built binary directly:
 
 - Use your keyboard to type on the virtual PET keyboard
 - Press `Escape` to exit the emulator
+- Press `F2` to open the file dialog for loading .prg files
+
+### Loading .prg Files
+
+The emulator can load Commodore PET .prg files (BASIC programs and machine
+code). Place your .prg files in the `./software` directory, then:
+
+1. Press `F2` to open the file browser
+2. Use `Up/Down` arrow keys to navigate
+3. Press `Enter` to select and load a .prg file
+4. Press `Backspace` to navigate up to parent directory
+5. Press `F2` to close without selecting
+
+When you select a file, it will be loaded into memory and "RUN" will be
+typed automatically to start the program.
+
+Software for the PET is available at:
+https://zimmers.net/anonftp/pub/cbm/pet/
 
 ## ROMs
 
