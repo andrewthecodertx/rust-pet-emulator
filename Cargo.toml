@@ -8,4 +8,4 @@ bitflags = "2.4"
 sdl2 = { version = "0.38", features = ["ttf"] }
 
 [dependencies.mos6502]
-path = "../rust-6502-emulator"
+git = "https://github.com/andrewthecodertx/rust-mos6502-emulator"
