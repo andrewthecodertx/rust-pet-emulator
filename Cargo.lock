@@ -35,6 +35,7 @@ checksum = "459427e2af2b9c839b132acb702a1c654d95e10f8c326bfc2ad11310e458b1c5"
 [[package]]
 name = "mos6502"
 version = "0.1.0"
+source = "git+https://github.com/andrewthecodertx/rust-mos6502-emulator#01b336bc9a7db6cdfc996a908e4e47668749c999"
 
 [[package]]
 name = "pet4032"
