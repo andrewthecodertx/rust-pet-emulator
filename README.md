@@ -83,3 +83,11 @@ The emulator requires ROM files which should be placed in the
 
 These ROM files are bundled with the project and should already be
 present in the `roms/` directory.
+
+## License
+
+MIT, see [LICENSE](LICENSE).
+
+## Contributing
+
+PRs welcome. Please open an issue first for major changes.
